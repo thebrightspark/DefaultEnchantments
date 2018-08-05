@@ -4,13 +4,14 @@ import com.google.common.base.MoreObjects;
 import net.minecraft.enchantment.Enchantment;
 import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
+import net.minecraftforge.oredict.OreDictionary;
 
 import java.util.Set;
 
 public class ItemEnchantments
 {
     private String itemRegistryName;
-    private int itemMetadata;
+    private Integer itemMetadata;
     private Set<SingleEnchantment> enchantments;
 
     private transient ItemStack itemStack;
@@ -32,7 +33,7 @@ public class ItemEnchantments
         {
             Item item = Item.getByNameOrId(itemRegistryName);
             if(item != null)
-                itemStack = new ItemStack(item, 1, itemMetadata);
+                itemStack = new ItemStack(item, 1, itemMetadata == null ? OreDictionary.WILDCARD_VALUE : itemMetadata);
         }
         return itemStack;
     }
