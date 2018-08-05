@@ -1,0 +1,24 @@
+{
+    "modListVersion": 2,
+    "modList":
+    [
+        {
+          "modid": "defaultenchantments",
+          "name": "Default Enchantments",
+          "description": "A Minecraft mod to add enchantments to items by default",
+          "version": "${version}",
+          "mcversion": "${mcversion}",
+          "url": "",
+          "updateUrl": "",
+          "authorList": ["bright_spark"],
+          "credits": "",
+          "logoFile": "",
+          "screenshots": [],
+          "parent": "",
+          "dependants": [],
+          "dependencies": [],
+          "requiredMods": [],
+          "useDependencyInformation": true
+        }
+    ]
+}
