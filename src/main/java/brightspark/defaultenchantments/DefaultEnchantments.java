@@ -4,12 +4,17 @@ import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
 import net.minecraft.enchantment.Enchantment;
 import net.minecraft.enchantment.EnchantmentHelper;
+import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.item.ItemStack;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.common.Mod.EventHandler;
 import net.minecraftforge.fml.common.event.FMLPreInitializationEvent;
+import net.minecraftforge.fml.common.event.FMLServerAboutToStartEvent;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import net.minecraftforge.fml.common.gameevent.PlayerEvent;
+import net.minecraftforge.fml.common.network.NetworkRegistry;
+import net.minecraftforge.fml.common.network.simpleimpl.SimpleNetworkWrapper;
+import net.minecraftforge.fml.relauncher.Side;
 import net.minecraftforge.oredict.OreDictionary;
 import org.apache.logging.log4j.Logger;
 
@@ -28,17 +33,25 @@ public class DefaultEnchantments
     public static final String VERSION = "@VERSION@";
     private static final String FILE_NAME = "defaultEnchantments.json";
 
-    private static Logger logger;
-    private static Collection<ItemEnchantments> itemEnchantments;
+    public static Logger logger;
+    private static File modConfigDir;
+    private static SimpleNetworkWrapper network;
+    public static Collection<ItemEnchantments> itemEnchantments;
 
     @EventHandler
-    public void preInit(FMLPreInitializationEvent event) throws IOException
+    public void preInit(FMLPreInitializationEvent event)
     {
         logger = event.getModLog();
+        modConfigDir = new File(event.getModConfigurationDirectory(), MOD_ID);
+        network = NetworkRegistry.INSTANCE.newSimpleChannel(MOD_ID);
+        network.registerMessage(ConfigSyncMessage.Handler.class, ConfigSyncMessage.class, 0, Side.CLIENT);
+    }
 
-        logger.info("Starting to read {}", FILE_NAME);
+    @EventHandler
+    public void serverStart(FMLServerAboutToStartEvent event) throws IOException
+    {
+        logger.info("Starting to read default item enchantments from file {}", FILE_NAME);
 
-        File modConfigDir = new File(event.getModConfigurationDirectory(), MOD_ID);
         if(!modConfigDir.exists() && !modConfigDir.mkdir())
             throw new RuntimeException("Error creating mod config directory " + MOD_ID);
         File jsonFile = new File(modConfigDir, FILE_NAME);
@@ -65,11 +78,11 @@ public class DefaultEnchantments
 
         if(itemEnchantments == null || itemEnchantments.isEmpty())
         {
-            logger.warn("No item enchantments loaded from {}!", FILE_NAME);
+            logger.warn("No default item enchantments loaded from {}!", FILE_NAME);
             return;
         }
 
-        logger.info("Read enchantments:\n{}", itemEnchantments);
+        logger.info("Read default item enchantments:\n{}", itemEnchantments);
 
         //Validate item enchantments
         Iterator<ItemEnchantments> iterator = itemEnchantments.iterator();
@@ -83,7 +96,7 @@ public class DefaultEnchantments
             }
         }
 
-        logger.info("Loaded {} item enchantments from {}", itemEnchantments.size(), FILE_NAME);
+        logger.info("Loaded {} default item enchantments from {}", itemEnchantments.size(), FILE_NAME);
     }
 
     /**
@@ -97,7 +110,7 @@ public class DefaultEnchantments
         return null;
     }
 
-    @Mod.EventBusSubscriber
+    @Mod.EventBusSubscriber(modid = MOD_ID)
     public static class DEHandler
     {
         /**
@@ -109,9 +122,9 @@ public class DefaultEnchantments
             if(ie != null)
             {
                 Map<Enchantment, Integer> enchantments = EnchantmentHelper.getEnchantments(stack);
-                logger.info("{} enchantments before: {}", stack, enchantments);
+                //logger.info("{} enchantments before: {}", stack, enchantments);
                 ie.getEnchantments().forEach(se -> enchantments.put(se.getEnchantment(), se.getStrength()));
-                logger.info("{} enchantments after: {}", stack, enchantments);
+                //logger.info("{} enchantments after: {}", stack, enchantments);
                 EnchantmentHelper.setEnchantments(enchantments, stack);
             }
         }
@@ -126,6 +139,13 @@ public class DefaultEnchantments
         public static void itemSmelted(PlayerEvent.ItemSmeltedEvent event)
         {
             tryEnchant(event.smelting);
+        }
+
+        @SubscribeEvent
+        public static void onPlayerJoin(PlayerEvent.PlayerLoggedInEvent event)
+        {
+            logger.info("Sending default item enchantments to {}", event.player.getName());
+            network.sendTo(new ConfigSyncMessage(), (EntityPlayerMP) event.player);
         }
     }
 }
