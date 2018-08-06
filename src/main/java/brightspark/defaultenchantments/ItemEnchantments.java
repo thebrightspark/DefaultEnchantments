@@ -10,14 +10,14 @@ import net.minecraftforge.common.util.Constants;
 import net.minecraftforge.common.util.INBTSerializable;
 import net.minecraftforge.oredict.OreDictionary;
 
-import java.util.HashSet;
-import java.util.Set;
+import java.util.LinkedList;
+import java.util.List;
 
 public class ItemEnchantments implements INBTSerializable<NBTTagCompound>
 {
     private String itemRegistryName;
     private Integer itemMetadata;
-    private Set<SingleEnchantment> enchantments;
+    private List<SingleEnchantment> enchantments;
 
     private transient ItemStack itemStack;
 
@@ -32,7 +32,7 @@ public class ItemEnchantments implements INBTSerializable<NBTTagCompound>
         deserializeNBT(nbt);
     }
 
-    public Set<SingleEnchantment> getEnchantments()
+    public List<SingleEnchantment> getEnchantments()
     {
         return enchantments;
     }
@@ -76,7 +76,7 @@ public class ItemEnchantments implements INBTSerializable<NBTTagCompound>
         itemRegistryName = nbt.getString("name");
         itemMetadata = nbt.getInteger("meta");
         if(enchantments == null)
-            enchantments = new HashSet<>();
+            enchantments = new LinkedList<>();
         else
             enchantments.clear();
         NBTTagList list = nbt.getTagList("enchantments", Constants.NBT.TAG_COMPOUND);
