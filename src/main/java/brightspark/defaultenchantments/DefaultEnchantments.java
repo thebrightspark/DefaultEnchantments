@@ -23,6 +23,7 @@ import java.io.FileReader;
 import java.io.IOException;
 import java.util.Collection;
 import java.util.Iterator;
+import java.util.LinkedList;
 import java.util.Map;
 
 @Mod(modid = DefaultEnchantments.MOD_ID, name = DefaultEnchantments.NAME, version = DefaultEnchantments.VERSION)
@@ -57,26 +58,30 @@ public class DefaultEnchantments
         File jsonFile = new File(modConfigDir, FILE_NAME);
         if(!jsonFile.exists())
         {
+            //Can't read a blank file
             logger.error("No {} file found! Creating blank file...");
             if(!jsonFile.createNewFile())
                 logger.error("File already existed!?");
-            //Can't read a blank file
-            return;
+        }
+        else
+        {
+            //Read item enchantments
+            Gson gson = new Gson();
+            try(FileReader reader = new FileReader(jsonFile))
+            {
+                itemEnchantments = gson.fromJson(reader, new TypeToken<Collection<ItemEnchantments>>(){}.getType());
+            }
+            catch(IOException e)
+            {
+                logger.error("Error reading from JSON file ", jsonFile);
+                throw e;
+            }
         }
 
-        //Read item enchantments
-        Gson gson = new Gson();
-        try(FileReader reader = new FileReader(jsonFile))
-        {
-            itemEnchantments = gson.fromJson(reader, new TypeToken<Collection<ItemEnchantments>>(){}.getType());
-        }
-        catch(IOException e)
-        {
-            logger.error("Error reading from JSON file ", jsonFile);
-            throw e;
-        }
+        if(itemEnchantments == null)
+            itemEnchantments = new LinkedList<>();
 
-        if(itemEnchantments == null || itemEnchantments.isEmpty())
+        if(itemEnchantments.isEmpty())
         {
             logger.warn("No default item enchantments loaded from {}!", FILE_NAME);
             return;
@@ -144,7 +149,7 @@ public class DefaultEnchantments
         @SubscribeEvent
         public static void onPlayerJoin(PlayerEvent.PlayerLoggedInEvent event)
         {
-            logger.info("Sending default item enchantments to {}", event.player.getName());
+            logger.info("Sending {} default item enchantments to {}", itemEnchantments.size(), event.player.getName());
             network.sendTo(new ConfigSyncMessage(), (EntityPlayerMP) event.player);
         }
     }
