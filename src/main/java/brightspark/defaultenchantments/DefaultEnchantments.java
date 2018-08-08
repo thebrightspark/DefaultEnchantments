@@ -18,9 +18,7 @@ import net.minecraftforge.fml.relauncher.Side;
 import net.minecraftforge.oredict.OreDictionary;
 import org.apache.logging.log4j.Logger;
 
-import java.io.File;
-import java.io.FileReader;
-import java.io.IOException;
+import java.io.*;
 import java.util.Collection;
 import java.util.Iterator;
 import java.util.LinkedList;
@@ -59,9 +57,11 @@ public class DefaultEnchantments
         if(!jsonFile.exists())
         {
             //Can't read a blank file
-            logger.error("No {} file found! Creating blank file...");
-            if(!jsonFile.createNewFile())
-                logger.error("File already existed!?");
+            logger.error("No {} file found! Creating file...");
+            try(BufferedWriter writer = new BufferedWriter(new FileWriter(jsonFile)))
+            {
+                writer.write("[\n\n]");
+            }
         }
         else
         {
