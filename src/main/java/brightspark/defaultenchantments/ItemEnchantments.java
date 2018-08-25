@@ -2,14 +2,18 @@ package brightspark.defaultenchantments;
 
 import com.google.common.base.MoreObjects;
 import com.google.common.base.Objects;
+import net.minecraft.block.Block;
 import net.minecraft.enchantment.Enchantment;
 import net.minecraft.item.Item;
+import net.minecraft.item.ItemBlock;
 import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.nbt.NBTTagList;
+import net.minecraft.util.StringUtils;
 import net.minecraftforge.common.util.Constants;
 import net.minecraftforge.common.util.INBTSerializable;
 import net.minecraftforge.oredict.OreDictionary;
+import net.minecraftforge.registries.IForgeRegistryEntry;
 
 import java.util.LinkedList;
 import java.util.List;
@@ -40,6 +44,16 @@ public class ItemEnchantments implements INBTSerializable<NBTTagCompound>
         return enchantments;
     }
 
+    public boolean isValid()
+    {
+        if(items == null || items.isEmpty())
+            return false;
+        for(SingleItem item : items)
+            if(!item.isValid())
+                return false;
+        return true;
+    }
+
     @Override
     public String toString()
     {
@@ -56,9 +70,12 @@ public class ItemEnchantments implements INBTSerializable<NBTTagCompound>
         NBTTagList itemList = new NBTTagList();
         items.forEach(singleItem -> itemList.appendTag(singleItem.serializeNBT()));
         nbt.setTag("items", itemList);
-        NBTTagList enchantmentList = new NBTTagList();
-        enchantments.forEach(singleEnchantment -> enchantmentList.appendTag(singleEnchantment.serializeNBT()));
-        nbt.setTag("enchantments", enchantmentList);
+        if(enchantments != null && !enchantments.isEmpty())
+        {
+            NBTTagList enchantmentList = new NBTTagList();
+            enchantments.forEach(singleEnchantment -> enchantmentList.appendTag(singleEnchantment.serializeNBT()));
+            nbt.setTag("enchantments", enchantmentList);
+        }
         return nbt;
     }
 
@@ -75,21 +92,26 @@ public class ItemEnchantments implements INBTSerializable<NBTTagCompound>
             enchantments = new LinkedList<>();
         else
             enchantments.clear();
-        list = nbt.getTagList("enchantments", Constants.NBT.TAG_COMPOUND);
-        list.forEach(tag -> enchantments.add(new SingleEnchantment((NBTTagCompound) tag)));
+        if(nbt.hasKey("enchantments"))
+        {
+            list = nbt.getTagList("enchantments", Constants.NBT.TAG_COMPOUND);
+            list.forEach(tag -> enchantments.add(new SingleEnchantment((NBTTagCompound) tag)));
+        }
     }
 
     public static class SingleItem implements INBTSerializable<NBTTagCompound>
     {
-        private String registryName;
+        private String registryName, className;
         private Integer metadata;
 
+        private transient Class<? extends IForgeRegistryEntry.Impl> itemOrBlockClass;
         private transient ItemStack itemStack;
 
-        public SingleItem(String registryName, Integer metadata)
+        public SingleItem(String registryName, Integer metadata, String className)
         {
             this.registryName = registryName;
             this.metadata = metadata;
+            this.className = className;
         }
 
         public SingleItem(NBTTagCompound nbt)
@@ -99,13 +121,60 @@ public class ItemEnchantments implements INBTSerializable<NBTTagCompound>
 
         public ItemStack getItemStack()
         {
-            if(itemStack == null)
+            if(!StringUtils.isNullOrEmpty(registryName) && itemStack == null)
             {
                 Item item = Item.getByNameOrId(registryName);
                 if(item != null)
                     itemStack = new ItemStack(item, 1, metadata == null ? OreDictionary.WILDCARD_VALUE : metadata);
             }
             return itemStack;
+        }
+
+        public Class<? extends IForgeRegistryEntry.Impl> getItemOrBlockClass()
+        {
+            if(!StringUtils.isNullOrEmpty(className) && itemOrBlockClass == null)
+            {
+                try
+                {
+                    Class<?> c = Class.forName(className);
+                    itemOrBlockClass = c.asSubclass(IForgeRegistryEntry.Impl.class);
+                }
+                catch(ClassNotFoundException | ClassCastException e)
+                {
+                    e.printStackTrace();
+                }
+            }
+            return itemOrBlockClass;
+        }
+
+        public boolean isValid()
+        {
+            if(StringUtils.isNullOrEmpty(registryName) && StringUtils.isNullOrEmpty(className))
+                return false;
+            if(!StringUtils.isNullOrEmpty(className))
+            {
+                //Make sure the class is an Item or Block
+                Class c = getItemOrBlockClass();
+                return c != null && (Item.class.isAssignableFrom(c) || Block.class.isAssignableFrom(c));
+            }
+            return true;
+        }
+
+        public boolean matches(ItemStack stack)
+        {
+            ItemStack stackToMatch = getItemStack();
+            if(stackToMatch != null)
+                return OreDictionary.itemMatches(stackToMatch, stack, false);
+
+            Class classToMatch = getItemOrBlockClass();
+            if(classToMatch != null)
+            {
+                Object stackItem = stack.getItem();
+                if(stackItem instanceof ItemBlock) stackItem = ((ItemBlock) stackItem).getBlock();
+                return classToMatch.isInstance(stackItem);
+            }
+
+            return false;
         }
 
         @Override
@@ -122,6 +191,7 @@ public class ItemEnchantments implements INBTSerializable<NBTTagCompound>
             return MoreObjects.toStringHelper(this)
                     .add("registryName", registryName)
                     .add("metadata", metadata)
+                    .add("className", className)
                     .toString();
         }
 
@@ -129,8 +199,9 @@ public class ItemEnchantments implements INBTSerializable<NBTTagCompound>
         public NBTTagCompound serializeNBT()
         {
             NBTTagCompound nbt = new NBTTagCompound();
-            nbt.setString("name", registryName);
-            nbt.setInteger("meta", metadata);
+            if(registryName != null) nbt.setString("name", registryName);
+            if(metadata != null) nbt.setInteger("meta", metadata);
+            if(className != null) nbt.setString("class", className);
             return nbt;
         }
 
@@ -138,7 +209,8 @@ public class ItemEnchantments implements INBTSerializable<NBTTagCompound>
         public void deserializeNBT(NBTTagCompound nbt)
         {
             registryName = nbt.getString("name");
-            metadata = nbt.getInteger("meta");
+            metadata = nbt.hasKey("meta") ? nbt.getInteger("meta") : null;
+            className = nbt.getString("class");
         }
     }
 
