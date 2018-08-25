@@ -6,7 +6,7 @@ import net.minecraftforge.fml.common.network.simpleimpl.IMessage;
 import net.minecraftforge.fml.common.network.simpleimpl.IMessageHandler;
 import net.minecraftforge.fml.common.network.simpleimpl.MessageContext;
 
-import java.util.HashSet;
+import java.util.LinkedList;
 
 public class ConfigSyncMessage implements IMessage
 {
@@ -16,7 +16,7 @@ public class ConfigSyncMessage implements IMessage
     public void fromBytes(ByteBuf buf)
     {
         int size = buf.readInt();
-        DefaultEnchantments.itemEnchantments = new HashSet<>();
+        DefaultEnchantments.itemEnchantments = new LinkedList<>();
         for(int i = 0; i < size; i++)
             DefaultEnchantments.itemEnchantments.add(new ItemEnchantments(ByteBufUtils.readTag(buf)));
         DefaultEnchantments.logger.info("Received default item enchantments from server: {}", DefaultEnchantments.itemEnchantments);
