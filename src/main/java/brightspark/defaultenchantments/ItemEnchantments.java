@@ -9,9 +9,11 @@ import net.minecraft.item.ItemBlock;
 import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.nbt.NBTTagList;
+import net.minecraft.util.ResourceLocation;
 import net.minecraft.util.StringUtils;
 import net.minecraftforge.common.util.Constants;
 import net.minecraftforge.common.util.INBTSerializable;
+import net.minecraftforge.fml.common.registry.ForgeRegistries;
 import net.minecraftforge.oredict.OreDictionary;
 import net.minecraftforge.registries.IForgeRegistryEntry;
 
@@ -234,8 +236,13 @@ public class ItemEnchantments implements INBTSerializable<NBTTagCompound>
 
         public Enchantment getEnchantment()
         {
-            if(enchantment == null)
-                enchantment = Enchantment.getEnchantmentByLocation(registryName);
+            if(enchantment == null) {
+                ResourceLocation resLoc = new ResourceLocation(registryName);
+                enchantment = ForgeRegistries.ENCHANTMENTS.getValue(resLoc);
+                if (enchantment == null) {
+                    DefaultEnchantments.logger.info("Enchantment {} does not exist!", resLoc);
+                }
+            }
             return enchantment;
         }
 
