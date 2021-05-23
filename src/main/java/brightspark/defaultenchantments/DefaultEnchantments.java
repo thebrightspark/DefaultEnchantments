@@ -10,7 +10,7 @@ import net.minecraft.item.ItemStack;
 import net.minecraftforge.event.entity.player.ItemTooltipEvent;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.common.Mod.EventHandler;
-import net.minecraftforge.fml.common.event.FMLInitializationEvent;
+import net.minecraftforge.fml.common.event.FMLPostInitializationEvent;
 import net.minecraftforge.fml.common.event.FMLPreInitializationEvent;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import net.minecraftforge.fml.common.gameevent.PlayerEvent;
@@ -43,7 +43,7 @@ public class DefaultEnchantments {
 	}
 
 	@EventHandler
-	public void init(FMLInitializationEvent event) throws IOException {
+	public void postInit(FMLPostInitializationEvent event) throws IOException {
 		logger.info("Starting to read default item enchantments from file {}", FILE_NAME);
 
 		if (!modConfigDir.exists() && !modConfigDir.mkdir())
@@ -78,11 +78,24 @@ public class DefaultEnchantments {
 		Iterator<ItemEnchantments> iterator = itemEnchantments.iterator();
 		while (iterator.hasNext()) {
 			ItemEnchantments ie = iterator.next();
+			logger.info("Validating {}", ie);
 			if (!areItemsValid(ie)) {
-				logger.warn("Entry in {} has invalid items -> {}", FILE_NAME, ie);
+				logger.warn("Invalid items -> {}", ie.getItems());
 				iterator.remove();
 			}
-			checkEnchantments(ie);
+			List<ItemEnchantments.SingleEnchantment> enchantments = ie.getEnchantments();
+			if (enchantments != null && !enchantments.isEmpty()) {
+				enchantments.removeIf(enchantment -> {
+					boolean invalid = enchantment.getEnchantment() == null;
+					if (invalid)
+						logger.warn("Invalid enchantment -> {}", enchantment);
+					return invalid;
+				});
+				if (enchantments.isEmpty()) {
+					logger.warn("Enchantments exist, but none are valid, so removing entry");
+					iterator.remove();
+				}
+			}
 		}
 
 		logger.info("Loaded {} default item enchantments from {}", itemEnchantments.size(), FILE_NAME);
@@ -100,18 +113,6 @@ public class DefaultEnchantments {
 			}
 		}
 		return valid;
-	}
-
-	private static void checkEnchantments(ItemEnchantments itemEnchantments) {
-		List<ItemEnchantments.SingleEnchantment> enchantments = itemEnchantments.getEnchantments();
-		if (enchantments == null || enchantments.isEmpty())
-			return;
-		enchantments.removeIf(enchantment -> {
-			boolean invalid = enchantment.getEnchantment() == null;
-			if (invalid)
-				logger.warn("Entry in {} has an invalid enchantment -> {}", FILE_NAME, enchantment);
-			return invalid;
-		});
 	}
 
 	/**
