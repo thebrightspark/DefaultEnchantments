@@ -41,15 +41,6 @@ public class ItemEnchantments implements INBTSerializable<NBTTagCompound> {
 		return enchantments;
 	}
 
-	public boolean isValid() {
-		if (items == null || items.isEmpty())
-			return false;
-		for (SingleItem item : items)
-			if (!item.isValid())
-				return false;
-		return true;
-	}
-
 	@Override
 	public String toString() {
 		return MoreObjects.toStringHelper(this)

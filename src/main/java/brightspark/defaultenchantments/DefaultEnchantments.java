@@ -8,8 +8,8 @@ import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.item.ItemStack;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.common.Mod.EventHandler;
+import net.minecraftforge.fml.common.event.FMLInitializationEvent;
 import net.minecraftforge.fml.common.event.FMLPreInitializationEvent;
-import net.minecraftforge.fml.common.event.FMLServerAboutToStartEvent;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import net.minecraftforge.fml.common.gameevent.PlayerEvent;
 import net.minecraftforge.fml.common.network.NetworkRegistry;
@@ -41,7 +41,7 @@ public class DefaultEnchantments {
 	}
 
 	@EventHandler
-	public void serverStart(FMLServerAboutToStartEvent event) throws IOException {
+	public void init(FMLInitializationEvent event) throws IOException {
 		logger.info("Starting to read default item enchantments from file {}", FILE_NAME);
 
 		if (!modConfigDir.exists() && !modConfigDir.mkdir())
@@ -50,7 +50,7 @@ public class DefaultEnchantments {
 
 		if (!jsonFile.exists()) {
 			//Can't read a blank file
-			logger.error("No {} file found! Creating file...");
+			logger.error("No {} file found! Creating file...", FILE_NAME);
 			try (BufferedWriter writer = new BufferedWriter(new FileWriter(jsonFile))) {
 				writer.write("[\n\n]");
 			}
@@ -58,18 +58,14 @@ public class DefaultEnchantments {
 			//Read item enchantments
 			Gson gson = new Gson();
 			try (FileReader reader = new FileReader(jsonFile)) {
-				itemEnchantments = gson.fromJson(reader, new TypeToken<Collection<ItemEnchantments>>() {
-				}.getType());
+				itemEnchantments = gson.fromJson(reader, new TypeToken<Collection<ItemEnchantments>>() {}.getType());
 			} catch (IOException e) {
-				logger.error("Error reading from JSON file ", jsonFile);
+				logger.error("Error reading from JSON file {}", jsonFile);
 				throw e;
 			}
 		}
 
-		if (itemEnchantments == null)
-			itemEnchantments = new LinkedList<>();
-
-		if (itemEnchantments.isEmpty()) {
+		if (itemEnchantments == null || itemEnchantments.isEmpty()) {
 			logger.warn("No default item enchantments loaded from {}!", FILE_NAME);
 			return;
 		}
@@ -80,13 +76,40 @@ public class DefaultEnchantments {
 		Iterator<ItemEnchantments> iterator = itemEnchantments.iterator();
 		while (iterator.hasNext()) {
 			ItemEnchantments ie = iterator.next();
-			if (!ie.isValid()) {
-				logger.warn("Invalid entry in {} -> {}", FILE_NAME, ie);
+			if (!areItemsValid(ie)) {
+				logger.warn("Entry in {} has invalid items -> {}", FILE_NAME, ie);
 				iterator.remove();
 			}
+			checkEnchantments(ie);
 		}
 
 		logger.info("Loaded {} default item enchantments from {}", itemEnchantments.size(), FILE_NAME);
+	}
+
+	private static boolean areItemsValid(ItemEnchantments itemEnchantments) {
+		List<ItemEnchantments.SingleItem> items = itemEnchantments.getItems();
+		if (items == null || items.isEmpty())
+			return false;
+		boolean valid = true;
+		for (ItemEnchantments.SingleItem item : items) {
+			if (!item.isValid()) {
+				valid = false;
+				logger.warn("Entry in {} has an invalid item -> {}", FILE_NAME, item);
+			}
+		}
+		return valid;
+	}
+
+	private static void checkEnchantments(ItemEnchantments itemEnchantments) {
+		List<ItemEnchantments.SingleEnchantment> enchantments = itemEnchantments.getEnchantments();
+		if (enchantments == null || enchantments.isEmpty())
+			return;
+		enchantments.removeIf(enchantment -> {
+			boolean invalid = enchantment.getEnchantment() == null;
+			if (invalid)
+				logger.warn("Entry in {} has an invalid enchantment -> {}", FILE_NAME, enchantment);
+			return invalid;
+		});
 	}
 
 	/**
@@ -94,11 +117,13 @@ public class DefaultEnchantments {
 	 */
 	private static LinkedList<ItemEnchantments.SingleEnchantment> getItemEnchantments(ItemStack stack) {
 		LinkedList<ItemEnchantments.SingleEnchantment> enchantments = new LinkedList<>();
+		if (itemEnchantments == null)
+			return enchantments;
 		for (ItemEnchantments ie : itemEnchantments)
 			for (ItemEnchantments.SingleItem item : ie.getItems())
 				if (item.matches(stack)) {
 					List<ItemEnchantments.SingleEnchantment> ie_e = ie.getEnchantments();
-					if (ie_e.isEmpty())
+					if (ie_e == null || ie_e.isEmpty())
 						//If no enchantments, then clear what we've collected so far
 						enchantments.clear();
 					else
