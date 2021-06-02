@@ -2,25 +2,21 @@ package brightspark.defaultenchantments;
 
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
-import net.minecraft.client.gui.GuiScreen;
-import net.minecraft.enchantment.Enchantment;
-import net.minecraft.enchantment.EnchantmentHelper;
-import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.item.ItemStack;
-import net.minecraftforge.event.entity.player.ItemTooltipEvent;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.common.Mod.EventHandler;
 import net.minecraftforge.fml.common.event.FMLPostInitializationEvent;
 import net.minecraftforge.fml.common.event.FMLPreInitializationEvent;
-import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
-import net.minecraftforge.fml.common.gameevent.PlayerEvent;
 import net.minecraftforge.fml.common.network.NetworkRegistry;
 import net.minecraftforge.fml.common.network.simpleimpl.SimpleNetworkWrapper;
 import net.minecraftforge.fml.relauncher.Side;
 import org.apache.logging.log4j.Logger;
 
 import java.io.*;
-import java.util.*;
+import java.util.Collection;
+import java.util.Iterator;
+import java.util.LinkedList;
+import java.util.List;
 
 @Mod(modid = DefaultEnchantments.MOD_ID, name = DefaultEnchantments.NAME, version = DefaultEnchantments.VERSION)
 public class DefaultEnchantments {
@@ -31,7 +27,7 @@ public class DefaultEnchantments {
 
 	public static Logger logger;
 	private static File modConfigDir;
-	private static SimpleNetworkWrapper network;
+	public static SimpleNetworkWrapper network;
 	public static Collection<ItemEnchantments> itemEnchantments;
 
 	@EventHandler
@@ -118,7 +114,7 @@ public class DefaultEnchantments {
 	/**
 	 * Get the ItemEnchantments for the given ItemStack
 	 */
-	private static LinkedList<ItemEnchantments.SingleEnchantment> getItemEnchantments(ItemStack stack) {
+	public static LinkedList<ItemEnchantments.SingleEnchantment> getItemEnchantments(ItemStack stack) {
 		LinkedList<ItemEnchantments.SingleEnchantment> enchantments = new LinkedList<>();
 		if (itemEnchantments == null)
 			return enchantments;
@@ -134,61 +130,5 @@ public class DefaultEnchantments {
 					break;
 				}
 		return enchantments;
-	}
-
-	@Mod.EventBusSubscriber(modid = MOD_ID)
-	public static class DEHandler {
-		/**
-		 * Attempt to enchant the given ItemStack
-		 */
-		private static void tryEnchant(ItemStack stack) {
-			LinkedList<ItemEnchantments.SingleEnchantment> enchantments = getItemEnchantments(stack);
-			if (!enchantments.isEmpty()) {
-				Map<Enchantment, Integer> stackEnchantments = EnchantmentHelper.getEnchantments(stack);
-				enchantments.forEach(se -> stackEnchantments.put(se.getEnchantment(), se.getStrength()));
-				EnchantmentHelper.setEnchantments(stackEnchantments, stack);
-			}
-		}
-
-		@SubscribeEvent
-		public static void itemCrafted(PlayerEvent.ItemCraftedEvent event) {
-			tryEnchant(event.crafting);
-		}
-
-		@SubscribeEvent
-		public static void itemSmelted(PlayerEvent.ItemSmeltedEvent event) {
-			tryEnchant(event.smelting);
-		}
-
-		@SubscribeEvent
-		public static void onPlayerJoin(PlayerEvent.PlayerLoggedInEvent event) {
-			logger.info("Sending {} default item enchantments to {}", itemEnchantments.size(), event.player.getName());
-			network.sendTo(new ConfigSyncMessage(), (EntityPlayerMP) event.player);
-		}
-
-		@SubscribeEvent
-		public static void onTooltip(ItemTooltipEvent event) {
-			ItemStack stack = event.getItemStack();
-			if (GuiScreen.isShiftKeyDown()) {
-				List<ItemEnchantments.SingleEnchantment> enchantments = getItemEnchantments(stack);
-				if (enchantments.size() == 0)
-					return;
-
-				List<String> tooltip = event.getToolTip();
-				if (!tooltip.isEmpty())
-					tooltip.add("");
-				tooltip.add("Default enchantments on craft:");
-				enchantments.stream()
-					.filter(enchantment -> enchantment.getEnchantment() != null)
-					.map(enchantment -> "  - " + enchantment.getEnchantment().getTranslatedName(enchantment.getStrength()))
-					.sorted()
-					.forEach(tooltip::add);
-			} else if (!getItemEnchantments(stack).isEmpty()) {
-				List<String> tooltip = event.getToolTip();
-				if (!tooltip.isEmpty())
-					tooltip.add("");
-				tooltip.add("SHIFT for default enchantments");
-			}
-		}
 	}
 }
